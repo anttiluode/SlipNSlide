@@ -83,8 +83,26 @@
     </section>
 
     <section class="results-grid">
-      <article class="panel"><div class="kicker">FINAL METRICS</div><h2>What survived?</h2><div id="metricsTable" class="metrics-table empty">Run all 14 episodes to generate the frozen receipt.</div></article>
-      <article class="panel"><div class="kicker">PREDECLARED GATE</div><h2>Did the mechanism work?</h2><div id="criteriaList" class="criteria-list"><div class="criterion neutral">No result yet</div></div></article>
+      <article class="panel"><div class="kicker">FINAL METRICS</div><h2>What survived?</h2><div id="metricsTable" class="metrics-table empty">Run all 14 episodes to generate the Gate 1 receipt.</div></article>
+      <article class="panel"><div class="kicker">PREDECLARED GATE</div><h2>Did Gate 1 work?</h2><div id="criteriaList" class="criteria-list"><div class="criterion neutral">No result yet</div></div></article>
+    </section>
+
+    <section id="gate2Section" class="panel gate2-panel">
+      <div class="section-head">
+        <div><div class="kicker">GATE 2 // FUNCTIONAL RESIDUAL COHERENCE</div><h2>Grow from coherent effects, not coherent weight vectors</h2></div>
+        <div id="gate2Verdict" class="verdict neutral">CALCULATING</div>
+      </div>
+      <p class="gate2-copy">Gate 1 stays frozen. Gate 2 changes only the geometry used to decide whether repeated incompatible proposals agree: it compares their finite effects on the Gravel and Ice rollouts. Growth still uses the original norm and coherence thresholds.</p>
+      <div class="gate2-flow" id="gate2Trigger">clipped proposals → finite effects → coherence → structural growth → learned routing</div>
+      <div class="gate2-stats">
+        <div class="meter-card"><span>parameter coherence at trigger</span><strong id="gate2ParamCoherence">—</strong><small>raw unresolved ΔW directions</small></div>
+        <div class="meter-card accent"><span>functional coherence at trigger</span><strong id="gate2FunctionalCoherence">—</strong><small>finite [ΔH gravel, ΔH ice]</small></div>
+        <div class="meter-card"><span>structure</span><strong id="gate2Growth">—</strong><small>same 0.42 coherence threshold</small></div>
+        <div class="meter-card"><span>gate separation</span><strong id="gate2GateSeparation">—</strong><small>Gravel vs Ice activation</small></div>
+        <div class="meter-card"><span>tail advantage</span><strong id="gate2TailAdvantage">—</strong><small>Gate 2 minus ordinary</small></div>
+      </div>
+      <div class="gate2-conclusion" id="gate2Conclusion">The result is computed from the committed Gate 2 mechanism for the selected seed.</div>
+      <div id="gate2Criteria" class="criteria-list"></div>
     </section>
 
     <section class="panel log-panel">
@@ -98,7 +116,7 @@
     </details>
   </main>
 
-  <footer><p>This is a deliberately minimal control world, not a physics-complete robot simulation. A PASS supports only the frozen claim in the repository. A FAIL stays visible.</p></footer>
+  <footer><p>This is a deliberately minimal control world, not a physics-complete robot simulation. Gate 1 and Gate 2 keep their frozen failures visible; later gates do not rewrite earlier evidence.</p></footer>
   <script type="module" src="src/ui.js"></script>
 </body>
 </html>
