@@ -24,6 +24,17 @@ function cloneRoute(r) {
 
 export function routeFlatLength(){ return H*OBS + H*H + H + H + 1; }
 
+export function controllerSlices(c) {
+  const routeLen=routeFlatLength();
+  if(c.routes.length!==2 || !c.gate) throw new Error('controllerSlices requires a grown two-route controller');
+  const gateLen=OBS+1;
+  return {
+    route0:{start:0,end:routeLen},
+    route1:{start:routeLen,end:routeLen*2},
+    gate:{start:routeLen*2,end:routeLen*2+gateLen}
+  };
+}
+
 function flattenRoute(r, out) {
   out.push(...r.Win, ...r.Wrec, ...r.b, ...r.Wout, r.bout);
 }
