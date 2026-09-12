@@ -32,6 +32,6 @@ const receipt={
 };
 await mkdir(new URL('../results/',import.meta.url),{recursive:true});
 const out=new URL(`../results/gate3-seed${seed}.json`,import.meta.url);
-await writeFile(out,JSON.stringify(receipt,null,2)+'\n');
+await writeFile(out,JSON.stringify(receipt)+'\n');
 console.log(JSON.stringify(receipt,null,2));
 console.log(`wrote ${out.pathname}`);
