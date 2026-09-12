@@ -173,6 +173,24 @@ function criteriaFor(ordinary,functional,events){
   };
 }
 
+export function runGate2GrowthSnapshot(seed=CONFIG.seed){
+  const initSeed=deriveSeed(seed,'init-controller');
+  const arm=makeArm(createController(makeRng(initSeed)));
+  const events=[];
+  for(let idx=0;idx<CONFIG.schedule.length;idx++){
+    const terrain=CONFIG.schedule[idx];
+    const proposalSeed=deriveSeed(seed,'proposal-episode',idx);
+    const deltas=proposalBatch(arm.controller,makeRng(proposalSeed),CONFIG.proposalCount,CONFIG.proposalSigma);
+    const functional=stepFunctional(arm,terrain,deltas,hashBatch(deltas),idx+1);
+    const event={episode:idx+1,terrain,proposalSeed,functional};
+    events.push(event);
+    if(functional.grew){
+      return {seed,growthEpisode:idx+1,controller:cloneController(arm.controller),events};
+    }
+  }
+  throw new Error('Gate 2 did not grow for this seed');
+}
+
 export function runGate2(seed=CONFIG.seed){
   const gate1=runAll(seed);
   const initSeed=deriveSeed(seed,'init-controller');
