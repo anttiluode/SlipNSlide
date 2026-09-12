@@ -1,0 +1,42 @@
+export const CONFIG = Object.freeze({
+  seed: 23,
+  dt: 0.04,
+  stepsPerEpisode: 140,
+  targetV: 1.0,
+  mass: 2.0,
+  wheelRadius: 0.24,
+  wheelInertia: 0.065,
+  maxTorque: 1.2,
+  wheelDamping: 0.055,
+  bodyDrag: 0.22,
+  pitchDecay: 0.92,
+  pitchGain: 0.018,
+  terrains: Object.freeze({
+    G: Object.freeze({name: 'Gravel', peakSlip: 0.95, maxTraction: 2.5}),
+    I: Object.freeze({name: 'Ice', peakSlip: 0.16, maxTraction: 0.82})
+  }),
+  reward: Object.freeze({
+    tracking: 1.6,
+    progress: 0.42,
+    slip: 0.075,
+    energy: 0.035,
+    stability: 0.08
+  }),
+  schedule: Object.freeze(['G','G','G','G','I','I','I','I','G','I','G','I','G','I']),
+  hiddenSize: 8,
+  proposalCount: 24,
+  proposalSigma: 0.075,
+  minImprovement: 0.002,
+  scaleBank: Object.freeze([1, 0.75, 0.5, 0.25, 0.125, 0]),
+  collisionBudget: 0.085,
+  residualBeta: 1.0,
+  growthThreshold: 0.58,
+  coherenceWindow: 3,
+  minCoherence: 0.42,
+  minClippedForGrowth: 2,
+  growthResidualScale: 0.32,
+  successMargin: 0.04,
+  ordinaryConflictMin: 0.03,
+  gateSeparationMin: 0.05,
+  tracedClipMin: 1
+});
