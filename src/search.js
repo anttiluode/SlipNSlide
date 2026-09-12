@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { initialState, observe, stepPhysics, stepReward } from './physics.js';
-import { cloneController, flattenController, applyFlatDelta, runControllerStep } from './controller.js';
+import { cloneController, flattenController, applyFlatDelta, runControllerStep, controllerSlices } from './controller.js';
 
 export function evaluateController(controller, terrain, options={}) {
   const steps = options.steps ?? CONFIG.stepsPerEpisode;
@@ -43,6 +43,19 @@ export function proposalBatch(baseController, rng, count=CONFIG.proposalCount, s
     const d=new Float64Array(dim);
     for(let j=0;j<dim;j++) d[j]=rng.normal()*sigma;
     batch.push(d);
+  }
+  return batch;
+}
+
+export function maskedProposalBatch(baseController, rng, count=CONFIG.proposalCount, sigma=CONFIG.proposalSigma, mask=['gate']) {
+  const slices=controllerSlices(baseController);
+  for(const name of mask) if(!slices[name]) throw new Error(`Unknown controller slice: ${name}`);
+  const selected=mask.map(name=>slices[name]);
+  const batch=proposalBatch(baseController,rng,count,sigma);
+  for(const delta of batch){
+    for(let i=0;i<delta.length;i++){
+      if(!selected.some(s=>i>=s.start && i<s.end)) delta[i]=0;
+    }
   }
   return batch;
 }
