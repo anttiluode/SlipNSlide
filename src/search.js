@@ -36,6 +36,15 @@ export function evaluateController(controller, terrain, options={}) {
   };
 }
 
+export function evaluateForcedRoute(controller, terrain, routeIndex, options={}) {
+  if(controller.routes.length!==2 || !controller.gate) throw new Error('evaluateForcedRoute requires a grown two-route controller');
+  if(routeIndex!==0 && routeIndex!==1) throw new Error('routeIndex must be 0 or 1');
+  const forced=cloneController(controller);
+  forced.gate.w.fill(0);
+  forced.gate.b=routeIndex===0 ? -40 : 40;
+  return evaluateController(forced,terrain,options);
+}
+
 export function proposalBatch(baseController, rng, count=CONFIG.proposalCount, sigma=CONFIG.proposalSigma) {
   const dim = flattenController(baseController).length;
   const batch=[];
