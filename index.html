@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SlipNSlide: an auditable ThirdWay-inspired continual-learning experiment in a hidden-terrain robot world.">
+  <title>SlipNSlide — prediction is not preservation</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="eyebrow">THIRDWAY // PHYSICAL NEGATIVE-OR-POSITIVE CONTROL</div>
+    <h1>Slip<span>N</span>Slide</h1>
+    <p class="lede">Two robots. Same search budget. Hidden terrain. One learner overwrites; the other measures causal collision, carries signed residual debt, and is allowed to grow only when the frozen rule says so.</p>
+    <div class="hero-row">
+      <div id="verdict" class="verdict neutral">NOT RUN</div>
+      <div class="seed-note">Frozen reference seed <strong>23</strong>. Other seeds may fail differently.</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="controls panel">
+      <div class="control-group">
+        <button id="runBtn" class="primary">Run</button>
+        <button id="stepBtn">Step episode</button>
+        <button id="resetBtn">Reset same seed</button>
+      </div>
+      <label>Seed <input id="seedInput" type="number" value="23" step="1"></label>
+      <label>Speed
+        <select id="speedSelect">
+          <option value="1200">slow</option>
+          <option value="600" selected>normal</option>
+          <option value="220">fast</option>
+        </select>
+      </label>
+      <button id="auditToggle">Show machinery</button>
+    </section>
+
+    <section class="viewer-note">Terrain badge below is <strong>viewer-only</strong>. The controller never receives ICE/GRAVEL as an input feature.</section>
+
+    <section class="robots-grid">
+      <article class="robot-card panel" data-arm="ordinary">
+        <div class="card-head"><div><div class="kicker">BASELINE</div><h2>Ordinary shared route</h2></div><div id="ordinaryScore" class="big-number">—</div></div>
+        <div class="world" id="ordinaryWorld">
+          <div class="terrain-label" id="ordinaryTerrain">waiting</div><div class="track"></div>
+          <div class="robot" id="ordinaryRobot"><div class="body"><span>ONE ROUTE</span></div><div class="wheel w1"></div><div class="wheel w2"></div></div>
+        </div>
+        <div class="mini-grid">
+          <div><span>velocity</span><strong id="ordinaryV">—</strong></div><div><span>slip</span><strong id="ordinarySlip">—</strong></div><div><span>torque</span><strong id="ordinaryU">—</strong></div><div><span>routes</span><strong id="ordinaryRoutes">1</strong></div>
+        </div>
+        <svg class="trace" id="ordinaryTrace" viewBox="0 0 500 120" preserveAspectRatio="none" aria-label="ordinary live trace"></svg>
+      </article>
+
+      <article class="robot-card panel third" data-arm="thirdway">
+        <div class="card-head"><div><div class="kicker">RESIDUAL GROWTH</div><h2>Compatibility-aware route</h2></div><div id="thirdScore" class="big-number">—</div></div>
+        <div class="world" id="thirdWorld">
+          <div class="terrain-label" id="thirdTerrain">waiting</div><div class="track"></div>
+          <div class="robot" id="thirdRobot"><div class="body"><span id="thirdBodyLabel">ROUTE 0</span></div><div class="wheel w1"></div><div class="wheel w2"></div></div>
+        </div>
+        <div class="mini-grid">
+          <div><span>velocity</span><strong id="thirdV">—</strong></div><div><span>slip</span><strong id="thirdSlip">—</strong></div><div><span>torque</span><strong id="thirdU">—</strong></div><div><span>gate</span><strong id="thirdGate">—</strong></div>
+        </div>
+        <svg class="trace" id="thirdTrace" viewBox="0 0 500 120" preserveAspectRatio="none" aria-label="thirdway live trace"></svg>
+      </article>
+    </section>
+
+    <section class="timeline panel">
+      <div class="section-head"><div><div class="kicker">FROZEN SCHEDULE</div><h2>Learning sequence</h2></div><div id="episodeLabel">episode 0 / 14</div></div>
+      <div id="schedule" class="schedule"></div>
+    </section>
+
+    <section id="machinery" class="machinery panel hidden">
+      <div class="section-head"><div><div class="kicker">NO HIDDEN MAGIC</div><h2>ThirdWay machinery</h2></div><div id="proposalStatus">waiting</div></div>
+      <div class="mach-grid">
+        <div class="meter-card"><span>proposal</span><strong id="proposalId">—</strong><small id="proposalImprove">—</small></div>
+        <div class="meter-card"><span>protected collision</span><strong id="collision">—</strong><small>finite replay RMS</small></div>
+        <div class="meter-card"><span>safe fraction α</span><strong id="alpha">—</strong><small id="absorbed">absorbed —</small></div>
+        <div class="meter-card"><span>signed residual</span><strong id="residual">—</strong><div class="bar"><i id="residualBar"></i></div></div>
+        <div class="meter-card"><span>coherence</span><strong id="coherence">—</strong><small id="clippedCount">clipped —</small></div>
+        <div class="meter-card"><span>structure</span><strong id="routeCount">1 route</strong><small id="growthCount">0 growth events</small></div>
+      </div>
+      <div class="route-diagram" id="routeDiagram"><div class="node input">physical<br>observations</div><div class="arrow">→</div><div class="node route">route 0</div><div class="arrow">→</div><div class="node output">motor</div></div>
+    </section>
+
+    <section class="results-grid">
+      <article class="panel"><div class="kicker">FINAL METRICS</div><h2>What survived?</h2><div id="metricsTable" class="metrics-table empty">Run all 14 episodes to generate the frozen receipt.</div></article>
+      <article class="panel"><div class="kicker">PREDECLARED GATE</div><h2>Did the mechanism work?</h2><div id="criteriaList" class="criteria-list"><div class="criterion neutral">No result yet</div></div></article>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="section-head"><div><div class="kicker">EVENT LOG</div><h2>Proposal → collision → residual → growth</h2></div><button id="clearLogBtn">Clear view</button></div>
+      <div id="eventLog" class="event-log"><div class="log-line muted">Waiting for the first real episode.</div></div>
+    </section>
+
+    <details id="auditDrawer" class="panel audit">
+      <summary>Audit drawer — seed, frozen constants, candidate scores, anchors, residual and event JSON</summary>
+      <pre id="auditJson">{ "status": "not run" }</pre>
+    </details>
+  </main>
+
+  <footer><p>This is a deliberately minimal control world, not a physics-complete robot simulation. A PASS supports only the frozen claim in the repository. A FAIL stays visible.</p></footer>
+  <script type="module" src="src/ui.js"></script>
+</body>
+</html>
