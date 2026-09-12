@@ -14,5 +14,6 @@ jobs:
           node-version: 20
       - run: npm test
       - run: npm run result -- 23
-      - name: Verify frozen receipt stayed frozen
+      - name: Verify Gate 1 frozen receipt stayed frozen
         run: git diff --exit-code -- results/seed23.json
+      - run: npm run gate2 -- 23
