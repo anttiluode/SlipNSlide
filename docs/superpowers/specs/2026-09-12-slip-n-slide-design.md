@@ -12,11 +12,41 @@ Can a learner that decomposes proposed recurrent-weight changes into a compatibl
 
 This repository is not a claim that ThirdWay T7B already proved repair or structural growth. T7B showed useful signed residual geometry but failed its frozen gate and produced zero genuine repair events. SlipNSlide tests the next stronger mechanism: measured collision, residual carry, and residual-triggered route growth.
 
+## Frozen evaluation protocol
+
+The first complete comparative run is the evaluation. Its default seed is **23**. Once the source containing the constants below is committed, the default seed-23 outcome is not used to tune them. If the gate fails, the site reports failure.
+
+Unit tests may use other seeds and synthetic forced states to verify arithmetic and trigger logic, but they may not be used to optimize the comparative outcome. Physics sanity tests may establish that the two terrains really have different traction optima before the full learner comparison is run.
+
+Frozen first-gate constants:
+
+```text
+evaluation seed                 23
+episode physics steps           240
+dt                              0.025 s
+target speed                    1.0
+initial route hidden width      4
+candidate proposals / episode   20
+proposal sigma                  0.08
+minimum target improvement      0.002
+safe scale bank                 1, .75, .5, .25, .125, 0
+protected collision budget C    0.08
+signed residual decay beta      1.0
+residual growth threshold B     0.09
+coherence window                3 nonzero residuals
+coherence threshold             0.75
+recent clipped-conflict count   2 of last 3 learning episodes
+new-route residual RMS cap      0.15
+new-route gate bias             -1.5
+```
+
+These values are part of the experimental object, not knobs to optimize after observing seed 23.
+
 ## Environment
 
 The browser simulates a small 1D crawler moving left-to-right.
 
-State variables include:
+State variables:
 
 - body position `x`
 - body velocity `v`
@@ -24,17 +54,17 @@ State variables include:
 - chassis pitch proxy `phi`
 - previous motor command `u_prev`
 
-The controller observes only physically plausible quantities derived from these values:
+Controller observations are exactly five physically plausible normalized values:
 
-- velocity error relative to a target speed
-- body velocity
-- wheel/body slip ratio
-- previous motor command
-- pitch proxy
+1. target-speed error
+2. body velocity
+3. wheel/body slip ratio
+4. previous motor command
+5. chassis pitch proxy
 
 The controller never receives a terrain label.
 
-Two hidden terrain regimes exist:
+Two hidden terrain regimes exist.
 
 ### Gravel
 
@@ -42,330 +72,423 @@ High available traction. Sustained stronger torque is effective and excessive ca
 
 ### Ice
 
-Low traction with a nonlinear slip penalty. Excessive wheel torque increases wheelspin and can reduce useful longitudinal traction, so a gentler, more modulated command is favored.
-
-The exact coefficients are frozen in source and exposed in the audit drawer.
+Low traction with a sharp low-slip peak. Excessive wheel torque increases wheelspin and reduces useful longitudinal traction, so gentler/modulated commands are favored.
 
 ## Dynamics
 
-The simulation uses explicit fixed-step deterministic dynamics in JavaScript with a seeded PRNG for all stochasticity.
+The simulation is deterministic at fixed seed and uses explicit fixed-step dynamics in JavaScript.
 
-At each physics step:
+Frozen physical constants:
 
 ```text
-motor command -> wheel drive -> slip ratio -> terrain traction curve
-              -> longitudinal force -> body acceleration -> next state
+mass m                 1.0
+wheel radius r         0.10
+wheel inertia I        0.02
+normal force N         9.81
+max motor torque       1.20
+body drag              0.35
+wheel damping          0.04
+pitch drive            0.35
+pitch relaxation       1.8
 ```
 
-The traction function must be nonlinear rather than a simple force clip. On ice, sufficiently large slip lowers effective traction. On gravel, the useful traction peak occurs at a higher command/slip regime.
+Signed slip is
 
-The environment is intentionally simple enough to audit in one browser page. It is not intended as a physically complete vehicle model.
+```math
+s = \frac{r\omega-v}{\max(|v|,0.2)}.
+```
+
+For each terrain, traction uses a peaked slip curve rather than a force clip. With
+
+```math
+q = |s|/s_* ,
+```
+
+traction coefficient magnitude is
+
+```math
+\mu(s)=\mu_* q\exp(1-q).
+```
+
+The longitudinal traction force is `sign(s) * mu(s) * N`.
+
+Frozen terrain parameters:
+
+```text
+                mu_peak      slip_peak
+gravel             0.90          0.55
+ice                0.18          0.08
+```
+
+Thus useful traction genuinely falls again after excessive slip, especially on ice. The experiment must include an automated physics test showing distinct gravel/ice optimum command regimes before the learner result is interpreted.
+
+Wheel/body integration:
+
+```text
+motor command -> motor torque -> wheel acceleration
+wheel speed + body speed -> slip -> terrain traction
+traction - drag -> body acceleration -> next body state
+```
+
+The pitch proxy is driven by command magnitude and relaxes toward zero. It exists only to give the controller a second dynamical consequence of aggressive actuation; it is not a hidden terrain cue.
+
+This is an intentionally minimal kinematic/dynamic testbed, not a physically complete vehicle simulator.
 
 ## Controller
 
-The initial controller is a tiny recurrent network with one hidden route:
+The initial controller contains one recurrent route with hidden width 4:
 
 ```text
-observation -> recurrent hidden state -> motor command
+5 observations -> 4 recurrent hidden units -> motor command
 ```
 
-A parameter vector contains input, recurrent, output, and bias weights. The same controller is evaluated on both hidden terrains.
+Each route has input, recurrent, bias, output, and output-bias parameters. Hidden activation and output use `tanh`.
 
-When structural growth occurs, the ThirdWay-inspired learner gains a second recurrent route plus a small learned gate. The gate receives the same physical observations/history as the controller, not the hidden terrain identity.
+Initial weights are generated from the seeded PRNG with zero mean and standard deviation 0.18.
 
-The output becomes a learned blend of route outputs:
+When structural growth occurs, the residual-growth learner gains a second width-4 recurrent route plus a gate. The gate receives the same five physical observations plus a bias, never terrain identity.
+
+The motor command becomes
 
 ```math
-u_t = (1-g_t)u_t^{(0)} + g_t u_t^{(1)}
+u_t=(1-g_t)u_t^{(0)}+g_tu_t^{(1)},
 ```
 
-with `g_t` produced from observable state. The new route must not be wired permanently to either terrain.
+with `g_t = sigmoid(w_g^T o_t + b_g)`.
+
+The ordinary arm remains a one-route network for the entire run.
 
 ## Search and proposals
 
-Learning uses a small seeded evolutionary proposal process rather than backpropagation.
+Learning uses seeded evolutionary proposals, not backpropagation.
 
 For every learning episode:
 
-1. Start from the current parameter vector.
-2. Generate a fixed number of candidate perturbations from the seeded PRNG.
+1. Start from the current parameter state.
+2. Generate 20 candidate perturbations with proposal RMS scale 0.08 from a keyed deterministic PRNG stream.
 3. Simulate each candidate on the current training terrain.
-4. Select the candidate with the largest target-terrain reward improvement.
-5. Feed that proposed `Delta W` to the learner policy.
+4. Select the candidate with greatest target-terrain reward improvement.
+5. If improvement is below 0.002, commit nothing.
+6. Otherwise pass the selected `Delta W` to the arm-specific commit policy.
 
-Both comparison arms use the same seed, episode schedule, proposal count, perturbation scale bank, and physics budget.
+Before structural growth, both arms receive byte-identical candidate perturbations for their common parameter vector. After growth, candidate identity remains keyed by episode/candidate/parameter-role so the common old-route coordinates continue to receive identical proposal values; extra route/gate coordinates exist only in the grown arm. Both arms always receive the same **number of candidates and rollouts** per learning episode.
 
-The demo must record candidate scores so the user can verify that proposals were really evaluated.
+All candidate scores are stored in the audit log.
+
+## Reward
+
+Every terrain uses the same reward formula. There is no terrain-specific reward shaping.
+
+Per physics step, define:
+
+```math
+tracking = \exp(-2|v-v_*|)
+progress = \operatorname{clip}(v/v_*,0,1.5)/1.5
+slipPenalty = \min(1,|s|/3)
+energyPenalty = u^2
+stabilityPenalty = \min(1,(\phi/0.5)^2)
+```
+
+and
+
+```math
+r = tracking
+  + 0.25\,progress
+  - 0.35\,slipPenalty
+  - 0.03\,energyPenalty
+  - 0.05\,stabilityPenalty.
+```
+
+Episode reward is mean step reward.
 
 ## Comparison arms
 
-### 1. Ordinary shared controller
+### Ordinary shared controller
 
-The ordinary learner commits the best improving proposal directly when it clears a frozen minimum-improvement threshold.
+The ordinary learner commits the full best improving proposal whenever it clears the 0.002 improvement threshold.
 
-This arm has no protected-rollout compatibility test and no structural growth.
+It has no protected-rollout compatibility test, residual memory, or structural growth.
 
-### 2. ThirdWay-inspired residual-growth controller
+### ThirdWay-inspired residual-growth controller
 
-The same proposal first undergoes compatibility measurement against protected rollouts from earlier successfully learned behavior.
+The same selected proposal first undergoes compatibility measurement against frozen probe rollouts representing previously accepted behavior.
 
-The protected behavior is represented by frozen probe episodes and their controller response trajectories. Terrain labels may be used by the experiment harness to replay the correct physical probe environment, but never enter the controller input.
+The experiment harness knows which physical terrain to replay for a protected probe, but that terrain identity never appears in controller observations.
 
-## Causal collision radar
+## Protected anchors and causal collision radar
 
-For each protected probe set `k`, store an anchor response trajectory after that behavior is intentionally accepted:
+When a terrain first achieves an accepted episode reward at least 0.02 above that terrain's initial untrained reward, freeze a protected probe anchor for it. A later intentional accepted improvement on that same terrain may move its own anchor forward to the newly accepted behavior; collateral edits from another terrain do not move it.
+
+For protected probe `k`, response trajectory `H_k(W)` concatenates normalized samples at every fourth physics step of:
+
+- recurrent hidden state of route 0
+- motor output
+- body velocity divided by 1.5
+- slip divided by 3 and clipped to [-1,1]
+
+For candidate write `W -> W + Delta W`, finite collision is
 
 ```math
-A_k = H_k(W)
+c_k(\Delta W)=\operatorname{RMS}(H_k(W+\Delta W)-H_k(W)).
 ```
 
-where `H_k` contains the recurrent hidden trajectory, motor-output trajectory, body velocity, and slip trajectory over the frozen probe rollout.
-
-For a candidate write `W -> W + Delta W`, measure the actual finite rollout displacement:
-
-```math
-c_k(Delta W) = RMS(H_k(W + Delta W) - H_k(W)).
-```
-
-This is a response-space collision measure, not parameter distance and not a local gradient approximation.
+This is measured by actual counterfactual rollout, not parameter distance or a local derivative.
 
 ## Safe absorption
 
-Use a frozen scale bank such as:
+For the residual-growth arm, evaluate the frozen scale bank
 
 ```text
 1.0, 0.75, 0.5, 0.25, 0.125, 0
 ```
 
-Choose the largest scale `alpha` that:
+in descending order. Choose the largest `alpha` satisfying both:
 
-- still improves the current target terrain by at least the frozen minimum amount; and
-- keeps each protected response displacement under the frozen per-probe compatibility budget.
+- current-target reward improvement remains at least 0.002;
+- every already-protected non-target probe has finite collision `<= C = 0.08` relative to the pre-write controller.
 
-Commit only:
-
-```math
-alpha Delta W.
-```
-
-The unresolved component is:
+Commit only
 
 ```math
-r = (1-alpha) Delta W.
+\alpha\Delta W.
 ```
+
+The unresolved proposal component is
+
+```math
+r=(1-\alpha)\Delta W.
+```
+
+A full safe write has zero residual. A fully blocked proposal contributes the full proposal as residual.
 
 ## Signed residual memory
 
-The unresolved incompatible matrix component is accumulated as a signed parameter-space residual:
+Before growth, unresolved incompatible components accumulate with no decay:
 
 ```math
-R <- beta R + r
+R\leftarrow R+r.
 ```
 
-with frozen decay `beta` (default 1.0 for the first gate unless testing reveals unbounded stale accumulation before any growth event can be interpreted).
+`R` lives in the original route-0 parameter coordinates. Its displayed magnitude is parameter RMS.
 
-The experiment displays the residual norm and directional consistency over time.
+For directional coherence, retain the last three nonzero residual vectors. Normalize each to unit Euclidean norm and compute
 
-This signed residual is not claimed to be a proof of causal repair. It is a persistent record of proposal content that could not be safely absorbed.
+```math
+coherence = \frac{\|\hat r_1+\hat r_2+\hat r_3\|}{3}.
+```
+
+This equals 1 for perfectly aligned residuals and approaches 0 for cancelling directions.
 
 ## Structural growth trigger
 
-Growth occurs only when all frozen conditions are satisfied:
+A second route grows only when all three conditions are true:
 
-1. residual norm exceeds threshold `B`;
-2. residual direction has remained sufficiently coherent over a frozen recent window, so random conflicting proposals do not trigger growth;
-3. the current single-route controller demonstrably has a protected-vs-target conflict, measured by successful target proposals being repeatedly clipped by compatibility.
+1. `RMS(R) > B = 0.09`;
+2. three nonzero residuals exist and coherence is `>= 0.75`;
+3. at least two of the last three learning episodes contained a target-improving proposal that had to be clipped (`alpha < 1`) because of a protected non-target probe.
 
-The threshold and coherence test are fixed before the default run and shown in the audit UI.
+No terrain or episode number appears in this trigger.
+
+Only one growth event is allowed in the first gate. Further route proliferation is out of scope.
 
 ## Route initialization from residual
 
-When growth fires, the second route is initialized from a deterministic projection of the accumulated signed residual onto the recurrent/input/output blocks associated with the controller.
+At growth, route 0 remains unchanged.
 
-The projection must be explicit and inspectable. It may normalize residual magnitude for numerical stability, but it must not encode terrain-specific hand-written behavior.
+Construct a residual-derived alternative route as follows:
 
-The gate weights begin neutral/small and are thereafter mutated by the same evolutionary proposal mechanism.
+1. Take `R` in route-0 parameter coordinates.
+2. If its RMS exceeds 0.15, scale the whole vector down uniformly to RMS 0.15; otherwise leave it unchanged.
+3. Initialize route 1 as `route0 + R_clipped` for corresponding input/recurrent/bias/output coordinates.
+4. Initialize gate weights to zero and gate bias to -1.5.
 
-After growth, proposals may target both shared/gating parameters and route-specific parameters. Protected collision continues to be measured by actual probe rollouts.
+This means the new route begins near the preserved route but displaced specifically in the direction repeatedly proposed and repeatedly unsafe to absorb. No terrain-specific parameter is consulted.
+
+After growth, evolutionary candidates mutate route 0, route 1, and gate parameters. Compatibility protection remains active using actual probe rollouts. Signed pre-growth residual is frozen in the audit log and no longer triggers additional growth.
 
 ## Default episode schedule
 
-The default frozen sequence is:
+The frozen learning schedule is
 
 ```text
 G G G G  I I I I  G I G I G I
 ```
 
-where `G` and `I` select the physical environment for the experiment harness only.
+`G` and `I` select only the harness physics. The controller never receives these symbols.
 
-The controller never receives `G` or `I`.
-
-The first block allows a gravel-capable behavior to form, the second stresses it with ice, and the alternating tail measures retention and routing.
-
-## Reward
-
-Episode reward is a frozen weighted combination of:
-
-- target-speed tracking
-- forward progress
-- slip penalty
-- control-energy penalty
-- chassis-stability penalty
-
-The same reward definition is used for both arms and both terrains, except that terrain physics changes the resulting state trajectory.
-
-No separate terrain-specific reward shaping is allowed.
+The final six alternating episodes form the primary switching tail.
 
 ## Primary metrics
 
 For each arm report:
 
-- mean gravel reward after learning
-- mean ice reward after learning
-- alternating-tail mean reward
-- gravel retention after learning ice
-- ice retention after switching back to gravel
-- cumulative slip
+- post-training mean gravel reward from three no-learning evaluation episodes
+- post-training mean ice reward from three no-learning evaluation episodes
+- mean reward over the six alternating learning-tail episodes
+- gravel retention: final gravel evaluation minus reward at the end of the initial four-gravel block
+- ice retention: final ice evaluation minus reward at the end of the four-ice block
+- cumulative absolute slip
 - cumulative motor energy
 - accepted writes
 - clipped/rejected writes
-- growth events
-- final route count
+- total candidate rollouts
+- growth events and final route count
 
 For the residual-growth arm also report:
 
 - collision magnitude per protected probe
 - selected `alpha`
-- signed residual norm
-- residual directional coherence
-- route gate activation over time
+- signed residual RMS
+- residual coherence
+- gate activation mean and variance by terrain on final evaluation rollouts
 
-## Success criterion
+## Frozen success gate
 
-The first gate is considered interesting only if, under the same frozen seed and proposal budget:
+The first seed-23 gate is **PASS** only if all conditions hold:
 
-1. the ordinary controller shows a measurable conflict/forgetting cost between gravel and ice;
-2. the residual-growth controller triggers growth through the declared residual rule rather than a schedule or terrain condition;
-3. after growth, it improves alternating-tail performance and retention over the ordinary controller by a predeclared margin;
-4. both routes are behaviorally used, with gate activation varying as a function of observable physical state rather than staying permanently saturated;
-5. at least one repeated incompatibility event can be traced from proposal -> collision -> clipping -> residual accumulation -> growth.
+1. **There is a real conflict to solve.** Ordinary gravel retention after the four-ice block is at most `-0.03`, or its alternating-tail mean reward is at least `0.03` below the better of its single-terrain block-end rewards.
+2. **Growth is causal.** Residual-growth produces exactly one growth event, and its audit trail contains at least two clipped target-improving proposals before growth.
+3. **Growth beats the matched ordinary learner.** Residual-growth final mean of gravel+ice evaluation rewards is at least `ordinary + 0.04`, and its alternating-tail mean is at least `ordinary + 0.04`.
+4. **Retention improves.** Residual-growth gravel retention is at least `ordinary gravel retention + 0.03`.
+5. **Both routes are behaviorally used.** On final no-learning evaluations, mean gate activation differs between gravel and ice by at least 0.15, while neither terrain's mean gate is below 0.05 or above 0.95.
+6. **The full causal chain exists in the event log.** At least one sequence can be shown as target-improving proposal -> protected collision -> alpha clipping -> signed residual accumulation -> threshold/coherence trigger -> route growth.
 
-Failure of any of these is shown as failure, not hidden.
+If any condition fails, the dashboard prints **FAIL** and names the failed clauses. There is no automatic retuning or reseeding.
 
 ## Anti-cheat rules
 
-- Terrain identity is never an input feature.
+- Terrain identity is never a controller input.
 - No route is manually assigned to ice or gravel.
-- No prewritten ice or gravel policy is used.
-- Both arms use the same seeded proposal budget and episode schedule.
-- Every candidate score shown in the UI comes from an actual simulated rollout.
-- Compatibility is measured by actual finite counterfactual probe rollouts.
-- Growth can occur only from the frozen residual/coherence/conflict rule.
-- The growth threshold is not changed after observing the default outcome.
-- Reset with the same seed reproduces the same run.
+- No prewritten ice or gravel policy exists.
+- Both arms use the same seed, episode schedule, candidate count, and rollout budget.
+- Before growth, common-coordinate candidate perturbations are identical across arms.
+- Every candidate score shown comes from an actual rollout.
+- Compatibility is measured by finite counterfactual rollouts.
+- Growth can occur only through the frozen residual/coherence/conflict rule.
+- The seed-23 full result is run only after constants and gate are committed.
+- No constants are changed in response to the seed-23 result.
+- Reset with seed 23 reproduces the run bit-for-bit modulo browser floating-point implementation details.
 - Alternate seeds are allowed to fail visibly.
-- No prerecorded success animation is allowed.
+- No prerecorded success animation or fabricated trace is allowed.
 
 ## User interface
 
-The static page is a single experiment dashboard suitable for GitHub Pages.
+The static GitHub Pages site is a single experiment dashboard.
 
-Top section:
+### Robot view
 
-- two animated crawlers side-by-side: Ordinary and Residual Growth
-- ground strip visibly changes between gravel and ice
-- body motion, wheelspin, and current motor command are animated from actual simulation state
+Two animated crawlers run side-by-side:
 
-Middle section:
+- Ordinary Shared Controller
+- Residual Growth Controller
 
-- current episode and hidden-terrain indicator for the human viewer only
-- reward, velocity error, slip, and torque traces
-- comparison metrics
+The human viewer sees whether the track is gravel or ice; the controller does not. Wheel rotation is driven from simulated `omega`, body motion from `x`, and slip effects from the actual slip state.
 
-ThirdWay machinery panel:
+### Live traces
+
+Show actual simulation traces for:
+
+- velocity and target velocity
+- motor command
+- slip
+- episode reward
+- route gate activation
+
+### ThirdWay machinery panel
+
+Show:
 
 ```text
 proposal id
-candidate improvement
-protected collision
-safe fraction alpha
+best candidate improvement
+protected collision(s)
+safe alpha
 absorbed fraction
-residual norm / threshold
+residual RMS / B
 residual coherence
+recent clipped conflicts
 route count
 gate activation
 ```
 
-When growth occurs, the page visibly adds a second route in a small network diagram.
+When growth occurs, a small network diagram visibly gains route 1.
 
-Audit drawer:
+### Audit drawer
 
-- seed and PRNG state
+Expose:
+
+- seed and PRNG counters/keys
+- all frozen constants
 - physics constants
 - reward constants
-- controller parameter matrices
-- current proposal vector
-- candidate rollout scores
-- protected anchor hashes/summary
-- collision values
-- scale-bank evaluation
-- residual vector/norm
-- growth threshold/coherence values
-- complete event log
+- current controller matrices
+- current proposal vector summary
+- all candidate rollout scores
+- protected anchor summaries/hashes
+- collision values for every tested alpha
+- residual vector summary and RMS
+- coherence vectors/value
+- growth trigger clause states
+- complete chronological event log
+- frozen success-gate evaluation
 
-Controls:
+### Controls
 
 - Run / Pause
-- Step episode
+- Step one learning episode
 - Reset same seed
-- editable seed
-- speed multiplier
+- editable seed (changing it marks the run `exploratory`, not the frozen gate)
+- simulation speed multiplier
 - Show machinery / audit
 
 ## Implementation shape
 
-Keep the static site dependency-free and understandable:
+Keep the deployed site dependency-free:
 
 ```text
-index.html           page structure
-src/prng.js          deterministic seeded PRNG
-src/physics.js       terrain and crawler dynamics
-src/controller.js    recurrent routes and gating
-src/search.js        candidate generation and scoring
-src/compatibility.js probe anchors, collision, alpha selection, residual/growth
-src/experiment.js    matched two-arm episode runner
-src/ui.js            rendering, traces, audit drawer
-styles.css           presentation
+index.html                 page structure
+styles.css                 presentation
+src/config.js              all frozen experimental constants
+src/prng.js                keyed deterministic PRNG
+src/physics.js             terrain and crawler dynamics
+src/controller.js          recurrent routes and gating
+src/search.js              candidate generation and scoring
+src/compatibility.js       anchors, finite collision, alpha, residual, growth
+src/experiment.js          matched two-arm episode runner and frozen gate
+src/ui.js                  animation, charts, audit drawer
 ```
 
-A small Node-based test harness may import the pure JavaScript modules for deterministic tests without a browser. The deployed experiment remains static HTML/JS/CSS.
+Pure simulation modules use standard ES modules and avoid DOM dependencies. A Node test runner imports them directly.
 
-## Tests
+## Automated tests
 
-Automated tests must cover:
+Fast deterministic CI tests cover:
 
-- seeded PRNG reproducibility
-- terrain label absent from controller observations
-- high torque can reduce effective traction on ice
-- gravel and ice have distinct optimum torque/slip regimes
-- identical candidate streams across matched arms before policy-specific acceptance diverges them
+- seeded/keyed PRNG reproducibility
+- terrain label absent from the observation vector
+- high torque/high slip can reduce useful traction on ice
+- gravel and ice have distinct traction-optimum regimes
+- same pre-growth common-coordinate proposals across arms
+- candidate scoring uses actual rollout results
 - collision calculation from finite rollouts
-- largest-legal-alpha selection
-- rejected/clipped proposal accounting
-- signed residual arithmetic
-- no growth below threshold
-- no growth for incoherent residual directions even above raw norm threshold
-- deterministic growth when all frozen conditions are met
-- residual-derived route initialization without terrain lookup
-- reset/same-seed complete experiment reproducibility
-- visible failure when success criteria are not met
+- descending largest-legal-alpha selection
+- clipped/rejected accounting
+- signed residual addition with beta fixed at 1
+- coherence calculation for aligned and cancelling residuals
+- no growth below B
+- no growth with incoherent residuals above B
+- no growth without repeated clipped conflicts
+- deterministic growth when all three clauses are met
+- route-1 initialization equals route0 plus clipped residual and does not consult terrain
+- complete reset/same-seed reproducibility
+- frozen success-gate evaluator reports named failures rather than coercing pass
 
-CI should run only deterministic fast tests. No heavy simulation is required.
+CI does not need a browser or heavy compute.
 
 ## Claim boundary
 
-A successful SlipNSlide result would support only this bounded statement:
+A successful SlipNSlide result would support only:
 
-> In this frozen minimal control world, an online compatibility test plus persistent signed residual and residual-triggered route growth preserved conflicting behaviors better than a matched single-route evolutionary controller.
+> In this frozen minimal control world, an online finite-rollout compatibility test plus persistent signed residual and residual-triggered route growth preserved conflicting behaviors better than a matched single-route evolutionary controller.
 
-It would not establish a general continual-learning solution, biological mechanism, or universal superiority over standard neural architectures.
+It would not establish a general continual-learning solution, a biological mechanism, or universal superiority over standard neural architectures.
