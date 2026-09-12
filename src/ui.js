@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { createExperiment, stepEpisode, runAll } from './experiment.js';
+import { runGate2 } from './gate2.js';
 
 const $=id=>document.getElementById(id);
 let exp=null, timer=null, currentEvent=null, finalResult=null, traceFrame=0, animationTimer=null;
@@ -107,16 +108,38 @@ function renderFinal(r){
   $('auditJson').textContent=JSON.stringify(r,null,2);
 }
 
+function renderGate2(r){
+  const growth=r.events.map(e=>({episode:e.episode,...e.functional})).find(e=>e.grew);
+  const triggerParameterCoherence=growth?.growthDetails?.triggerParameterCoherence;
+  const triggerFunctionalCoherence=growth?.growthDetails?.triggerFunctionalCoherence;
+  const verdict=$('gate2Verdict');
+  verdict.textContent=`GATE 2 · ${r.verdict}`;
+  verdict.className=`verdict ${r.verdict==='PASS'?'pass':'fail'}`;
+  $('gate2ParamCoherence').textContent=fmt(triggerParameterCoherence,3);
+  $('gate2FunctionalCoherence').textContent=fmt(triggerFunctionalCoherence,3);
+  $('gate2Growth').textContent=growth?`${growth.growthDetails.preRoutes} → ${growth.growthDetails.postRoutes} routes`:`${r.functional.routes} route${r.functional.routes===1?'':'s'} · no growth`;
+  $('gate2GateSeparation').textContent=fmt(r.functional.gateSeparation,4);
+  $('gate2TailAdvantage').textContent=fmt(r.criteria.tailAdvantage.value,3);
+  $('gate2Trigger').textContent=growth
+    ?`Episode ${growth.episode}: parameter coherence ${fmt(triggerParameterCoherence,3)} < ${fmt(CONFIG.minCoherence,2)}, functional coherence ${fmt(triggerFunctionalCoherence,3)} > ${fmt(CONFIG.minCoherence,2)} → route ${growth.growthDetails.preRoutes}→${growth.growthDetails.postRoutes}`
+    :'No structural growth event under the frozen functional-coherence rule.';
+  $('gate2Conclusion').textContent=growth
+    ?`The functional geometry exposed a coherent demand and created route 1, but the learned gate separated Gravel from Ice by only ${fmt(r.functional.gateSeparation,4)}. Growth worked; routing did not specialize enough.`
+    :'Functional coherence did not satisfy the unchanged structural-growth rule for this seed.';
+  $('gate2Criteria').innerHTML=Object.entries(r.criteria).map(([name,c])=>`<div class="criterion ${c.pass?'pass':'fail'}"><span>${name.replace(/([A-Z])/g,' $1')}</span><strong>${c.pass?'PASS':'FAIL'} · ${fmt(c.value,3)} / ${fmt(c.threshold,3)}</strong></div>`).join('');
+}
+
 function reset(){
   clearInterval(timer); timer=null; clearInterval(animationTimer);
   const seed=Number($('seedInput').value||CONFIG.seed);
   exp=createExperiment(seed); currentEvent=null; finalResult=null;
   $('runBtn').textContent='Run'; $('verdict').textContent='NOT RUN'; $('verdict').className='verdict neutral';
-  $('metricsTable').className='metrics-table empty'; $('metricsTable').textContent='Run all 14 episodes to generate the frozen receipt.';
+  $('metricsTable').className='metrics-table empty'; $('metricsTable').textContent='Run all 14 episodes to generate the Gate 1 receipt.';
   $('criteriaList').innerHTML='<div class="criterion neutral">No result yet</div>';
   $('eventLog').innerHTML='<div class="log-line muted">Waiting for the first real episode.</div>';
   $('auditJson').textContent=JSON.stringify({seed,config:CONFIG,status:'ready'},null,2);
   renderSchedule();
+  renderGate2(runGate2(seed));
 }
 
 function step(){
