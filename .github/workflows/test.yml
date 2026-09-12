@@ -21,8 +21,5 @@ jobs:
         run: git diff --exit-code -- results/gate2-seed23.json
       - name: Run frozen Gate 3 seed 23
         run: npm run gate3 -- 23
-      - name: Upload Gate 3 frozen receipt
-        uses: actions/upload-artifact@v4
-        with:
-          name: gate3-seed23
-          path: results/gate3-seed23.json
+      - name: Verify Gate 3 frozen receipt stayed frozen
+        run: git diff --exit-code -- results/gate3-seed23.json
