@@ -1,0 +1,93 @@
+{
+  "seed": 23,
+  "schedule": [
+    "G",
+    "G",
+    "G",
+    "G",
+    "I",
+    "I",
+    "I",
+    "I",
+    "G",
+    "I",
+    "G",
+    "I",
+    "G",
+    "I"
+  ],
+  "config": {
+    "proposalCount": 24,
+    "proposalSigma": 0.075,
+    "minImprovement": 0.002,
+    "collisionBudget": 0.085,
+    "growthThreshold": 0.58,
+    "minCoherence": 0.42,
+    "minClippedForGrowth": 2,
+    "successMargin": 0.04
+  },
+  "ordinary": {
+    "gravelScore": 0.9050673592,
+    "iceScore": 0.9145990402,
+    "alternatingTailMean": 0.9733914604,
+    "gravelRetentionDelta": -0.1653526518,
+    "iceRetentionDelta": -0.117501553,
+    "meanSlip": 0.0555385156,
+    "meanEnergy": 0.0629978929,
+    "acceptedWrites": 14,
+    "rejectedWrites": 0,
+    "clippedWrites": 0,
+    "growthEvents": 0,
+    "routes": 1,
+    "gateG": 0,
+    "gateI": 0,
+    "gateSeparation": 0,
+    "traceableClips": 0
+  },
+  "thirdway": {
+    "gravelScore": 1.1460232924,
+    "iceScore": -0.8656049365,
+    "alternatingTailMean": 0.1402091779,
+    "gravelRetentionDelta": -0.0481182748,
+    "iceRetentionDelta": 0,
+    "meanSlip": 2.9220765161,
+    "meanEnergy": 0.2190794732,
+    "acceptedWrites": 7,
+    "rejectedWrites": 7,
+    "clippedWrites": 10,
+    "growthEvents": 0,
+    "routes": 1,
+    "gateG": 0,
+    "gateI": 0,
+    "gateSeparation": 0,
+    "traceableClips": 10
+  },
+  "criteria": {
+    "ordinaryConflict": {
+      "value": 0.1653526518,
+      "threshold": 0.03,
+      "pass": true
+    },
+    "growthTriggered": {
+      "value": 0,
+      "threshold": 1,
+      "pass": false
+    },
+    "tailAdvantage": {
+      "value": -0.8331822825,
+      "threshold": 0.04,
+      "pass": false
+    },
+    "gateUsesState": {
+      "value": 0,
+      "threshold": 0.05,
+      "pass": false
+    },
+    "traceableIncompatibility": {
+      "value": 10,
+      "threshold": 1,
+      "pass": true
+    }
+  },
+  "verdict": "FAIL"
+}
